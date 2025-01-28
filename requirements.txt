@@ -1,0 +1,9 @@
+gradio
+python-dotenv
+browser-use
+playwright
+langchain
+langchain-google-genai
+pyperclip
+pytest
+google.generativeai
