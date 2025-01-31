@@ -77,6 +77,7 @@ class CustomSystemPrompt(SystemPrompt):
     5. TASK COMPLETION:
        - If you think all the requirements of user\'s instruction have been completed and no further operation is required, output the done action to terminate the operation process.
        - Don't hallucinate actions.
+       - Use important_contents to build up memory for future actions. Whatever you think is important for the next steps, output it in important_contents. It will help you work out what is possible from the past experience
        - If the task requires specific information - make sure to include everything in the done function. This is what the user will see.
        - If you are running out of steps (current step), think about speeding it up, and ALWAYS use the done action as the last action.
        - Note that you must verify if you've truly fulfilled the user's request by examining the actual page content, not just by looking at the actions you output but also whether the action is executed successfully. Pay particular attention when errors occur during action execution.

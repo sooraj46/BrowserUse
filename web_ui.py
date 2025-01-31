@@ -980,7 +980,7 @@ def main():
     parser.add_argument("--ip", type=str, default="127.0.0.1", help="IP address to bind to")
     parser.add_argument("--port", type=int, default=7788, help="Port to listen on")
     parser.add_argument(
-        "--theme", type=str, default="Ocean",
+        "--theme", type=str, default="Monochrome",
         choices=["Default", "Soft", "Monochrome", "Glass", "Origin", "Citrus", "Ocean", "Base"],
         help="Theme to use for the UI"
     )
