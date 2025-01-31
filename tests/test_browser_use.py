@@ -33,9 +33,8 @@ async def test_browser_use_custom():
 
     llm = utils.get_llm_model(
         provider="gemini",
-        model_name="gemini-2.0-flash-thinking-exp-01-21",
+        model_name="gemini-2.0-flash-exp",
         temperature=1.0,
-        api_key=os.getenv("GOOGLE_API_KEY", "")
     )
 
 
@@ -93,7 +92,6 @@ async def test_browser_use_custom():
             agent = CustomAgent(
                 task="go to google.com and type 'OpenAI' click search and give me the first url",
                 add_infos="",  # some hints for llm to complete the task
-                llm=llm,
                 browser_context=browser_context,
                 controller=controller,
                 system_prompt_class=CustomSystemPrompt,
@@ -104,17 +102,17 @@ async def test_browser_use_custom():
             history: AgentHistoryList = await agent.run(max_steps=10)
 
             print("Final Result:")
-            pprint(history.final_result(), indent=4)
+            print(history.final_result(), indent=4)
 
             print("\nErrors:")
-            pprint(history.errors(), indent=4)
+            print(history.errors(), indent=4)
 
             # e.g. xPaths the model clicked on
             print("\nModel Outputs:")
-            pprint(history.model_actions(), indent=4)
+            print(history.model_actions(), indent=4)
 
             print("\nThoughts:")
-            pprint(history.model_thoughts(), indent=4)
+            print(history.model_thoughts(), indent=4)
             # close browser
     except Exception:
         import traceback
@@ -145,41 +143,15 @@ async def test_browser_use_custom_v2():
 
     window_w, window_h = 1920, 1080
 
-    # llm = utils.get_llm_model(
-    #     provider="azure_openai",
-    #     model_name="gpt-4o",
-    #     temperature=0.8,
-    #     base_url=os.getenv("AZURE_OPENAI_ENDPOINT", ""),
-    #     api_key=os.getenv("AZURE_OPENAI_API_KEY", ""),
-    # )
+    
 
     llm = utils.get_llm_model(
          provider="gemini",
          model_name="gemini-2.0-flash-exp",
          temperature=1.0,
-         api_key=os.getenv("GOOGLE_API_KEY", "")
      )
 
-    # llm = utils.get_llm_model(
-    #     provider="deepseek",
-    #     model_name="deepseek-reasoner",
-    #     temperature=0.8
-    # )
-
-    # llm = utils.get_llm_model(
-    #     provider="deepseek",
-    #     model_name="deepseek-chat",
-    #     temperature=0.8
-    # )
-
-    #llm = utils.get_llm_model(
-    #    provider="ollama", model_name="qwen2.5:7b", temperature=0.5
-    #)
-
-    # llm = utils.get_llm_model(
-    #     provider="ollama", model_name="deepseek-r1:14b", temperature=0.5
-    # )
-
+    
     controller = CustomController()
     use_own_browser = False
     disable_security = True
@@ -218,7 +190,6 @@ async def test_browser_use_custom_v2():
         agent = CustomAgent(
             task="go to google.com and type 'Nvidia' click search and give me the first url",
             add_infos="",  # some hints for llm to complete the task
-            llm=llm,
             browser=browser,
             browser_context=browser_context,
             controller=controller,
@@ -229,24 +200,23 @@ async def test_browser_use_custom_v2():
         history: AgentHistoryList = await agent.run(max_steps=10)
 
         print("Final Result:")
-        pprint(history.final_result(), indent=4)
+        print(history.final_result(), indent=4)
 
         print("\nErrors:")
-        pprint(history.errors(), indent=4)
+        print(history.errors(), indent=4)
 
         # e.g. xPaths the model clicked on
         print("\nModel Outputs:")
-        pprint(history.model_actions(), indent=4)
+        print(history.model_actions(), indent=4)
 
         print("\nThoughts:")
-        pprint(history.model_thoughts(), indent=4)
+        print(history.model_thoughts(), indent=4)
         # close browser
     except Exception:
         import traceback
 
         traceback.print_exc()
     finally:
-        # 显式关闭持久化上下文
         if browser_context:
             await browser_context.close()
 

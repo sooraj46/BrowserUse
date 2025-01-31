@@ -22,4 +22,9 @@ Thumbs.db
 
 venv/
 .pytest_cache/
-src/pycache/
+src/__pycache__/
+src/utils/__pycache__/
+src/agent/__pycache__/
+src/browser/__pycache__/
+src/controller/__pycache__/
+/tmp/

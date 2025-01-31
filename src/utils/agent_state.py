@@ -8,6 +8,10 @@ class AgentState:
             self._stop_requested = asyncio.Event()
             self.last_valid_state = None  # store the last valid browser state
 
+        
+        if not hasattr(self, '_pause_requested'):
+            self._pause_requested = asyncio.Event()
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(AgentState, cls).__new__(cls)
@@ -22,6 +26,18 @@ class AgentState:
 
     def is_stop_requested(self):
         return self._stop_requested.is_set()
+   
+    def request_pause(self):
+        """Set the 'pause_requested' event to True."""
+        self._pause_requested.set()
+
+    def clear_pause(self):
+        """Clear the 'pause_requested' event (resume)."""
+        self._pause_requested.clear()
+
+    def is_pause_requested(self):
+        """Check if the agent is paused."""
+        return self._pause_requested.is_set()
 
     def set_last_valid_state(self, state):
         self.last_valid_state = state

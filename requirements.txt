@@ -6,4 +6,4 @@ langchain
 langchain-google-genai
 pyperclip
 pytest
-google.generativeai
+google.genai

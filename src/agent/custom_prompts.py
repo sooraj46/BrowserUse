@@ -1,3 +1,4 @@
+from datetime import datetime
 import pdb
 from typing import List, Optional
 
@@ -6,10 +7,28 @@ from browser_use.agent.views import ActionResult
 from browser_use.browser.views import BrowserState
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from .custom_views import CustomAgentStepInfo
+from src.agent.custom_views import CustomAgentStepInfo
 
 
 class CustomSystemPrompt(SystemPrompt):
+    def __init__(
+        self,
+        default_action_description,
+        current_date: datetime,        
+        max_actions_per_step: int=10,    
+        task: str = "",
+    ):
+        """
+        Overriding the parent constructor to store the user task,
+        which we later insert into the prompt text.
+        """
+        super().__init__(
+            action_description=default_action_description,
+            current_date=current_date,
+            max_actions_per_step=max_actions_per_step,
+        )
+        self.task = task  # store user's actual task
+
     def important_rules(self) -> str:
         """
         Returns the important rules for the agent.
@@ -26,7 +45,7 @@ class CustomSystemPrompt(SystemPrompt):
            "summary": "Please generate a brief natural language description for the operation in next actions based on your Thought."
          },
          "action": [
-           * actions in sequences, please refer to **Common action sequences**. Each output action MUST be formated as: \{action_name\: action_params\}*
+           * actions in sequences, please refer to **Common action sequences**. Each output action MUST be formated as: {action_name: action_params} *
          ]
        }
 
@@ -88,8 +107,8 @@ class CustomSystemPrompt(SystemPrompt):
     def input_format(self) -> str:
         return """
     INPUT STRUCTURE:
-    1. Task: The user\'s instructions you need to complete.
-    2. Hints(Optional): Some hints to help you complete the user\'s instructions.
+    1. Task: The user's instructions you need to complete.
+    2. Hints(Optional): Some hints to help you complete the user's instructions.
     3. Memory: Important contents are recorded during historical operations for use in subsequent operations.
     4. Current URL: The webpage you're currently on
     5. Available Tabs: List of open browser tabs
@@ -106,22 +125,20 @@ class CustomSystemPrompt(SystemPrompt):
 
     Notes:
     - Only elements with numeric indexes are interactive
-    - _[:] elements provide context but cannot be interacted with
+     - _[:] elements provide context but cannot be interacted with
     """
 
     def get_system_message(self) -> SystemMessage:
         """
-        Get the system prompt for the agent.
-
-        Returns:
-            str: Formatted system prompt
+        Build and return the system prompt for the agent.
         """
         time_str = self.current_date.strftime("%Y-%m-%d %H:%M")
 
+        # Insert `self.task` so the LLM sees the user's actual request
         AGENT_PROMPT = f"""You are a precise browser automation agent that interacts with websites through structured commands. Your role is to:
     1. Analyze the provided webpage elements and structure
     2. Plan a sequence of actions to accomplish the given task
-    3. Your final result MUST be a valid JSON as the **RESPONSE FORMAT** described, containing your action sequence and state assessment, No need extra content to expalin.
+    3. Your final result MUST be a valid JSON as the **RESPONSE FORMAT** described, containing your action sequence and state assessment, No need extra content to explain.
 
     Current date and time: {time_str}
 
@@ -133,24 +150,26 @@ class CustomSystemPrompt(SystemPrompt):
     {self.default_action_description}
 
     Remember: Your responses must be valid JSON matching the specified format. Each action in the sequence must be valid."""
+
         return SystemMessage(content=AGENT_PROMPT)
 
 
 class CustomAgentMessagePrompt(AgentMessagePrompt):
     def __init__(
-            self,
-            state: BrowserState,
-            result: Optional[List[ActionResult]] = None,
-            include_attributes: list[str] = [],
-            max_error_length: int = 400,
-            step_info: Optional[CustomAgentStepInfo] = None,
+        self,
+        state: BrowserState,
+        result: Optional[List[ActionResult]] = None,
+        include_attributes: list[str] = [],
+        max_error_length: int = 400,
+        step_info: Optional[CustomAgentStepInfo] = None,
     ):
-        super(CustomAgentMessagePrompt, self).__init__(state=state,
-                                                       result=result,
-                                                       include_attributes=include_attributes,
-                                                       max_error_length=max_error_length,
-                                                       step_info=step_info
-                                                       )
+        super(CustomAgentMessagePrompt, self).__init__(
+            state=state,
+            result=result,
+            include_attributes=include_attributes,
+            max_error_length=max_error_length,
+            step_info=step_info
+        )
 
     def get_user_message(self) -> HumanMessage:
         if self.step_info:
@@ -158,7 +177,9 @@ class CustomAgentMessagePrompt(AgentMessagePrompt):
         else:
             step_info_description = ''
 
-        elements_text = self.state.element_tree.clickable_elements_to_string(include_attributes=self.include_attributes)
+        elements_text = self.state.element_tree.clickable_elements_to_string(
+            include_attributes=self.include_attributes
+        )
 
         has_content_above = (self.state.pixels_above or 0) > 0
         has_content_below = (self.state.pixels_below or 0) > 0
@@ -180,44 +201,38 @@ class CustomAgentMessagePrompt(AgentMessagePrompt):
             elements_text = 'empty page'
 
         state_description = f"""
-{step_info_description}
-1. Task: {self.step_info.task}
-2. Hints(Optional):
-{self.step_info.add_infos}
-3. Memory:
-{self.step_info.memory}
-4. Current url: {self.state.url}
-5. Available tabs:
-{self.state.tabs}
-6. Interactive elements:
-{elements_text}
+        {step_info_description}
+        1. Current url: {self.state.url}
+        2. Available tabs:
+        {self.state.tabs}
+        3. Interactive elements:
+        {elements_text}
         """
 
         if self.result:
-
-            for i, result in enumerate(self.result):
-                if result.include_in_memory:
-                    if result.extracted_content:
-                        state_description += f"\nResult of previous action {i + 1}/{len(self.result)}: {result.extracted_content}"
-                    if result.error:
-                        # only use last 300 characters of error
-                        error = result.error[-self.max_error_length:]
+            for i, action_result in enumerate(self.result):
+                if action_result.include_in_memory:
+                    if action_result.extracted_content:
                         state_description += (
-                            f"\nError of previous action {i + 1}/{len(self.result)}: ...{error}"
+                            f"\nResult of previous action {i + 1}/{len(self.result)}: {action_result.extracted_content}"
+                        )
+                    if action_result.error:
+                        error_trim = action_result.error[-self.max_error_length:]
+                        state_description += (
+                            f"\nError of previous action {i + 1}/{len(self.result)}: ...{error_trim}"
                         )
 
+        # If a screenshot is present, return it as an 'image_url' message for vision-based LLMs
         if self.state.screenshot:
-            # Format message for vision model
             return HumanMessage(
                 content=[
                     {"type": "text", "text": state_description},
                     {
                         "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{self.state.screenshot}"
-                        },
+                        "image_url": {"url": f"data:image/png;base64,{self.state.screenshot}"},
                     },
                 ]
             )
 
+        # Otherwise just return the text
         return HumanMessage(content=state_description)

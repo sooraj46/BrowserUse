@@ -3,32 +3,22 @@ import os
 import time
 from pathlib import Path
 from typing import Dict, Optional
+
 import gradio as gr
-import google.generativeai as genai
+import google.genai as genai
 
 
 def get_llm_model(provider: str, **kwargs):
-    """
-    获取LLM 模型
-    :param provider: 模型类型
-    :param kwargs:
-    :return:
-    """
     if provider == "gemini":
-        if not kwargs.get("api_key", ""):
-            api_key = os.getenv("GOOGLE_API_KEY", "")
-        else:
-            api_key = kwargs.get("api_key")
-        genai.configure(api_key=api_key) # Configure API key here
-        model = genai.GenerativeModel(kwargs.get("model_name", "gemini-pro")) # default to gemini-pro if not specified
-        return model # Return the Gemini model directly
+        api_key = kwargs.get("api_key") or os.getenv("GOOGLE_API_KEY", "")
+        model_name = kwargs.get("model_name", "gemini-2.0-flash-exp")
+        return GeminiModelWrapper(api_key, model_name) # Return the Gemini model directly
     else:
-        raise ValueError(f"Unsupported provider: {provider}. Only 'gemini' is supported in this configuration.")
-    
+        raise ValueError(f"Unsupported provider: {provider}")
 
 # Predefined model names for common providers
 model_names = {
-    "gemini": ["gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-1219" ],
+    "gemini": ["gemini-2.0-flash-exp", "gemini-2.0-flash-thinking-exp", "gemini-1.5-flash-latest", "gemini-1.5-flash-8b-latest", "gemini-2.0-flash-thinking-exp-1219" ,"gemini-2.0-flash-thinking-exp-01-21","gemini-1.5-pro","gemini-exp-1206"],
 }
 
 # Callback to update the model name dropdown based on the selected provider
@@ -102,7 +92,7 @@ async def capture_screenshot(browser_context):
         return None
 
     # Take screenshot
-    try:
+    try: # added try catch here to avoid crash
         screenshot = await active_page.screenshot(
             type='jpeg',
             quality=75,
@@ -112,3 +102,15 @@ async def capture_screenshot(browser_context):
         return encoded
     except Exception as e:
         return None
+    
+class GeminiModelWrapper:
+    def __init__(self, api_key, model_name):
+        self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY", ""))
+        self.model_name = model_name
+
+    def invoke(self, prompt_contents):
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt_contents
+        )
+        return response.text
