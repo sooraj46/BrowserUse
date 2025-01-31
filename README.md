@@ -5,6 +5,70 @@ This repository provides a custom implementation of a browser automation agent, 
 
 **This project is a customization of the excellent [browser-use](https://github.com/browser-use) library. We extend our sincere gratitude to the browser-use developers for creating such a powerful and versatile foundation. This project would not be possible without their work.**
 
+## Installation
+
+1. **Clone the repository:**
+
+   ```bash
+   git clone <repository_url>
+   cd <repository_directory>
+   ```
+
+2. **Create and activate a virtual environment (recommended):**
+
+   ```bash
+   python -m venv venv
+   source venv/bin/activate  # On Linux/macOS
+   venv\Scripts\activate  # On Windows
+   ```
+
+3. **Install the required Python packages:**
+
+   ```bash
+   pip install -r requirements.txt
+   playwright install 
+   ```
+
+4. **Set up environment variables:**
+
+   - You need a Google API key to use the Gemini models.
+   - Set the `GOOGLE_API_KEY` environment variable with your API key. You can do this by creating a `.env` file in the root directory with the following content:
+
+     ```
+     GOOGLE_API_KEY=YOUR_GEMINI_API_KEY
+     ```
+     Replace `YOUR_GEMINI_API_KEY` with your actual Gemini API key.
+
+   - (Optional) If you want to use your own Chrome browser instance, you may need to set `CHROME_PATH` and `CHROME_USER_DATA` environment variables. Refer to the `browser_use` library documentation for details.
+
+## Usage
+
+### Running the Web UI
+
+1.  Navigate to the repository directory in your terminal.
+2.  Run the `web_ui.py` script:
+
+    ```bash
+    python web_ui.py
+    ```
+
+3.  Open your web browser and go to the address displayed in the terminal (usually `http://127.0.0.1:7788`).
+4.  In the Web UI, you can:
+    - Configure agent settings, LLM parameters, and browser options under the respective tabs.
+    - Enter a task description and optional hints in the "Run Agent" tab.
+    - Click "▶️ Run Agent" to start the browser automation process.
+    - Monitor the live browser view, results, errors, and model outputs in the "Results" tab.
+    - Stop the agent using the "⏹️ Stop" button.
+    - View recordings and traces in the "Recordings" and "Results" tabs after the agent run.
+
+### Running Tests
+
+To run the tests, navigate to the repository root directory and use `pytest`:
+
+```bash
+pytest tests/
+```
+
 ## Directory Structure
 
 ```
@@ -61,69 +125,6 @@ This repository provides a custom implementation of a browser automation agent, 
     - `test_gemini_chat.py`: Tests specifically the interaction with the Gemini API using the `google.genai` library.
     - `test_playwright.py`: Tests core Playwright browser functionalities and connection.
 - **`web_ui.py`**:  A Gradio-based web user interface (`Browser Use WebUI`) to interact with the custom browser agent. It allows users to set tasks, configure agent parameters, run the agent, and view results, recordings, and traces.
-
-## Installation
-
-1. **Clone the repository:**
-
-   ```bash
-   git clone <repository_url>
-   cd <repository_directory>
-   ```
-
-2. **Create and activate a virtual environment (recommended):**
-
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Linux/macOS
-   venv\Scripts\activate  # On Windows
-   ```
-
-3. **Install the required Python packages:**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables:**
-
-   - You need a Google API key to use the Gemini models.
-   - Set the `GOOGLE_API_KEY` environment variable with your API key. You can do this by creating a `.env` file in the root directory with the following content:
-
-     ```
-     GOOGLE_API_KEY=YOUR_GEMINI_API_KEY
-     ```
-     Replace `YOUR_GEMINI_API_KEY` with your actual Gemini API key.
-
-   - (Optional) If you want to use your own Chrome browser instance, you may need to set `CHROME_PATH` and `CHROME_USER_DATA` environment variables. Refer to the `browser_use` library documentation for details.
-
-## Usage
-
-### Running the Web UI
-
-1.  Navigate to the repository directory in your terminal.
-2.  Run the `web_ui.py` script:
-
-    ```bash
-    python web_ui.py
-    ```
-
-3.  Open your web browser and go to the address displayed in the terminal (usually `http://127.0.0.1:7788`).
-4.  In the Web UI, you can:
-    - Configure agent settings, LLM parameters, and browser options under the respective tabs.
-    - Enter a task description and optional hints in the "Run Agent" tab.
-    - Click "▶️ Run Agent" to start the browser automation process.
-    - Monitor the live browser view, results, errors, and model outputs in the "Results" tab.
-    - Stop the agent using the "⏹️ Stop" button.
-    - View recordings and traces in the "Recordings" and "Results" tabs after the agent run.
-
-### Running Tests
-
-To run the tests, navigate to the repository root directory and use `pytest`:
-
-```bash
-pytest tests/
-```
 
 ## Contributing
 

@@ -3,6 +3,8 @@ from asyncio.log import logger
 import json
 from pydantic import BaseModel
 import pyperclip
+import pyautogui
+import platform
 from typing import List, Optional, Type
 from browser_use.agent.views import ActionResult, AgentOutput
 from browser_use.browser.context import BrowserContext
@@ -129,8 +131,15 @@ class CustomController(Controller):
         async def paste_from_clipboard(browser: BrowserContext):
             text = pyperclip.paste()
             page = await browser.get_current_page()
-            await page.keyboard.press("Meta+V")
-            return ActionResult(extracted_content=text)
+            system = platform.system()
+            if system == "Windows":
+                pyautogui.hotkey("ctrl", "v")
+            elif system == "Darwin":  # macOS
+                pyautogui.hotkey("command", "v")
+            elif system == "Linux":
+                pyautogui.hotkey("ctrl", "v")
+            else:
+                raise RuntimeError("Unsupported platform")
 
         @self.registry.action("Download a file from a given URL", param_model=DownloadFileAction, requires_browser=True)
         async def download_file(params: DownloadFileAction, browser: BrowserContext):
