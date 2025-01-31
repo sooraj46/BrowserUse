@@ -138,7 +138,7 @@ This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for d
 ```
 MIT License
 
-Copyright (c) 2023 Sooraj J Sundar
+Copyright (c) 2025 Sooraj J Sundar
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
