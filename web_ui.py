@@ -33,7 +33,7 @@ _global_browser = None
 _global_browser_context = None
 _global_agent_state = AgentState()
 _conversation_browser_initialized = False
-
+_global_agent = None
 
 
 
@@ -81,10 +81,6 @@ async def run_org_agent(
     """
     Example for an 'org' agent. (No longer actively used, but code kept for reference.)
     """
-    from browser_use.browser.browser import Browser
-    from browser_use.browser.context import BrowserContextConfig, BrowserContextWindowSize
-    from browser_use.agent.service import Agent
-    from browser_use.agent.views import AgentHistoryList
 
     global _global_browser, _global_browser_context, _global_agent_state
     _global_agent_state.clear_stop()
@@ -174,12 +170,7 @@ async def run_custom_agent(
         max_actions_per_step,
         tool_calling_method
 ):
-
-    from src.controller.custom_controller import CustomController
-    from src.browser.custom_browser import CustomBrowser
-    from browser_use.browser.context import BrowserContextConfig, BrowserContextWindowSize
-    from src.agent.custom_agent import CustomAgent
-
+    
     global _global_browser, _global_browser_context, _global_agent_state
     _global_agent_state.clear_stop()
 
@@ -225,10 +216,11 @@ async def run_custom_agent(
         tool_calling_method=tool_calling_method
     )
 
+    global _global_agent
+    _global_agent = agent
+    
     history = await agent.run(max_steps=max_steps)
-
-    # Save history
-    import os
+    
     history_file = os.path.join(save_agent_history_path, f"{agent.agent_id}.json")
     agent.save_history(history_file)
 
@@ -247,6 +239,7 @@ async def run_custom_agent(
         _global_browser_context = None
         _global_browser = None
 
+    _global_agent = None
     return final_result, errors, model_actions, model_thoughts, trace_file.get('.zip'), history_file
 
 async def run_browser_agent(
@@ -496,28 +489,56 @@ async def run_with_stream(
 
 
 async def agent_respond_stream(
-    conv_state, user_input, 
-    agent_type, llm_model_name, llm_temperature,
-    llm_base_url, llm_api_key, use_own_browser, keep_browser_open,
-    headless, disable_security, window_w, window_h, save_recording_path,
-    save_agent_history_path, save_trace_path, enable_recording, max_steps,
-    use_vision, max_actions_per_step, tool_calling_method
+    conv_state,
+    user_input,
+    agent_type,
+    llm_model_name,
+    llm_temperature,
+    llm_base_url,
+    llm_api_key,
+    use_own_browser,
+    keep_browser_open,
+    headless,
+    disable_security,
+    window_w,
+    window_h,
+    save_recording_path,
+    save_agent_history_path,
+    save_trace_path,
+    enable_recording,
+    max_steps,
+    use_vision,
+    max_actions_per_step,
+    tool_calling_method
 ):
-    if not conv_state:
-        conv_state = []
-    
-    global _global_browser, _global_browser_context, _conversation_browser_initialized
-
+    """
+    This function responds to a chat message from the user.
+    If an agent is already running, the new user input is added to its state,
+    so that the message is injected mid–task. Otherwise, a new agent is started.
+    Once a task has finished (final result output), the global agent is cleared
+    so that a new task can be started on subsequent input.
+    """
     user_message = user_input.strip()
     if not user_message:
         yield conv_state, gr.update(value="")
         return
-    
-    # Add user's message as a dict
+
+    global _global_agent
+    # If an agent is already running, add the new chat message to its state.
+    if _global_agent is not None:
+        # (If the agent has finished its run, _global_agent should have been cleared.
+        # Otherwise, this message is treated as mid–task input.)
+        _global_agent.agent_state.add_chat_message(user_message)
+        conv_state.append({"role": "user", "content": user_message})
+        yield conv_state, gr.update(value="")
+        return
+
+    # Otherwise, start a new conversation.
     conv_state.append({"role": "user", "content": user_message})
     yield conv_state, gr.update(value="")
-    
-    # Initialize browser and context only once for the conversation
+
+    # Initialize global browser and context if not already initialized.
+    global _global_browser, _global_browser_context, _conversation_browser_initialized, _global_agent_state
     if not _conversation_browser_initialized:
         if use_own_browser:
             chrome_path = os.getenv("CHROME_PATH", None)
@@ -527,6 +548,8 @@ async def agent_respond_stream(
             chrome_path = None
 
         if _global_browser is None:
+            from src.browser.custom_browser import CustomBrowser
+            from browser_use.browser.browser import BrowserConfig
             _global_browser = CustomBrowser(
                 config=BrowserConfig(
                     headless=headless,
@@ -537,6 +560,9 @@ async def agent_respond_stream(
             )
 
         if _global_browser_context is None:
+            # Import BrowserContextWindowSize from the correct package.
+            from src.browser.custom_context import BrowserContextConfig
+            from browser_use.browser.context import BrowserContextWindowSize
             _global_browser_context = await _global_browser.new_context(
                 config=BrowserContextConfig(
                     trace_path=save_trace_path,
@@ -545,14 +571,12 @@ async def agent_respond_stream(
                     browser_window_size=BrowserContextWindowSize(width=window_w, height=window_h),
                 )
             )
-        _conversation_browser_initialized = True # Set flag after initialization
+        _conversation_browser_initialized = True  # Mark that initialization is done.
 
-    # Create a controller, browser, and agent
+    # Create a controller and new agent for this conversation.
     controller = CustomController(agent_state=_global_agent_state)
-    
-    
     agent = CustomAgent(
-        task=user_message, # Use the user message as the task for this turn
+        task=user_message,  # Use the user message as the initial task.
         browser=_global_browser,
         browser_context=_global_browser_context,
         controller=controller,
@@ -561,33 +585,34 @@ async def agent_respond_stream(
         agent_state=_global_agent_state,
         tool_calling_method=tool_calling_method,
     )
-    
-    agent_response_text = ""  # Accumulate agent's response text
-    
-    # Run the agent stream
+    _global_agent = agent  # Save the running agent globally.
+
+    agent_response_text = ""  # Accumulate the agent's responses.
     async for partial_info in agent.run_stream(max_steps=max_steps):
         agent_thoughts = partial_info.get("thoughts", "")
         done_flag = partial_info.get("done", False)
-    
         step_output = ""
         if agent_thoughts:
-            step_output += f"**Thought**: {agent_thoughts}\n\n"
-    
+            step_output = f"**Thought**: {agent_thoughts}\n\n"
+
         if step_output:
-            agent_response_text += step_output
-    
-        # Update conversation with assistant's response
+            agent_response_text = step_output
+
+        # Update conversation state with the agent's response.
         conv_state.append({"role": "assistant", "content": agent_response_text})
         yield conv_state, gr.update(value="")
-    
+
         if done_flag:
             final_result = partial_info.get("final_result", "")
             if final_result:
-                agent_response_text += f"\n**Final Result**: {final_result}"
+                agent_response_text = f"\n**Final Result**: {final_result}"
                 conv_state.append({"role": "assistant", "content": agent_response_text})
             break
-    
+
+    # Clear the global agent variable after completion so that new input will start a new task.
+    _global_agent = None
     yield conv_state, gr.update(value="")
+
 
 def close_global_browser():
     """

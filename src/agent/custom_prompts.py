@@ -76,6 +76,7 @@ class CustomSystemPrompt(SystemPrompt):
 
     5. TASK COMPLETION:
        - If you think all the requirements of user\'s instruction have been completed and no further operation is required, output the done action to terminate the operation process.
+       - There is an exception for this. In case any ambuiguity, or needs user's confirmation, or input from user, output the done action and mention what is required in the done function.[Example when there is a login Page and you need to input OTP/ User Name/Password, you can output done action and mention that OTP/ User Name/Password is required.]
        - Don't hallucinate actions.
        - Use important_contents to build up memory for future actions. Whatever you think is important for the next steps, output it in important_contents. It will help you work out what is possible from the past experience
        - If the task requires specific information - make sure to include everything in the done function. This is what the user will see.

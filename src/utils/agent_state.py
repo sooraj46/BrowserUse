@@ -7,10 +7,22 @@ class AgentState:
         if not hasattr(self, '_stop_requested'):
             self._stop_requested = asyncio.Event()
             self.last_valid_state = None  # store the last valid browser state
-
         
         if not hasattr(self, '_pause_requested'):
             self._pause_requested = asyncio.Event()
+        if not hasattr(self, 'pending_chat_messages'):
+           self.pending_chat_messages = []  # list to store mid–task chat messages
+
+    def add_chat_message(self, message: str):
+        """Add a chat message to be included mid–task."""
+        self.pending_chat_messages.append(message)
+
+    def get_pending_chat_messages(self) -> list:
+        """Retrieve and clear all pending chat messages."""
+        messages = self.pending_chat_messages.copy()
+        self.pending_chat_messages.clear()
+        return messages
+
 
     def __new__(cls):
         if cls._instance is None:

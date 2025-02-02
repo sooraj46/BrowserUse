@@ -175,6 +175,20 @@ class CustomAgent(Agent):
 
         step_info.step_number += 1
 
+    def _unwrap_output(self, data):
+        """
+        Recursively unwrap dictionaries of the form {"type": "string", "value": <str>}
+        into a plain string.
+        """
+        if isinstance(data, dict):
+            if set(data.keys()) == {"type", "value"} and data.get("type") == "string":
+                return data["value"]
+            return {k: self._unwrap_output(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._unwrap_output(item) for item in data]
+        else:
+            return data 
+
     def _data_url_to_part(self, data_url: str) -> types.Part:
         """
         Converts a data URL to a GenAI Part object for image handling.
@@ -192,6 +206,10 @@ class CustomAgent(Agent):
         """
         Builds the contents array from prompt messages for the GenAI client.
         """
+
+        if len(prompt_messages) > 12:
+            prompt_messages = prompt_messages[:2] + prompt_messages[-10:]
+
         contents_list = []
         for msg in prompt_messages:
             # Access the .message attribute for ManagedMessage
@@ -266,6 +284,8 @@ class CustomAgent(Agent):
         sanitized = raw_response_str.replace("```json", "").replace("```", "")
         try:
             parsed_dict = json.loads(sanitized)
+            # Unwrap any nested string wrappers if present
+            parsed_dict = self._unwrap_output(parsed_dict)
         except json.JSONDecodeError:
             logger.error(f"LLM response is not valid JSON: {raw_response_str}")
             raise ValueError("LLM response is not valid JSON.")
@@ -320,6 +340,11 @@ class CustomAgent(Agent):
                     "actions": [],  # No actions when stopped
                 }
                 break
+                # Inject any mid–task chat messages submitted by the user.
+            pending_chats = self.agent_state.get_pending_chat_messages()
+            for chat in pending_chats:
+                from langchain_core.messages import HumanMessage
+                self.message_manager._add_message_with_tokens(HumanMessage(content=chat))
 
             input_messages = self.message_manager.build_message_list()
 
@@ -375,7 +400,7 @@ class CustomAgent(Agent):
                 "step": step_i + 1,
                 "thoughts": model_output.current_state.thought,
                 "done": is_done,
-                "final_result": model_output.current_state.summary if is_done else "",
+                "final_result": model_output.action[-1].done.text if is_done else "",
                 "actions": model_output.action
             }
             yield partial_info
