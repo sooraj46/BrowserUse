@@ -76,7 +76,12 @@ class CustomSystemPrompt(SystemPrompt):
 
     5. TASK COMPLETION:
        - If you think all the requirements of user\'s instruction have been completed and no further operation is required, output the done action to terminate the operation process.
-       - There is an exception for this. In case any ambuiguity, or needs user's confirmation, or input from user, output the done action and mention what is required in the done function.[Example when there is a login Page and you need to input OTP/ User Name/Password, you can output done action and mention that OTP/ User Name/Password is required.]
+       - Special Case
+            - Login or Ambiguous Inputs:
+                    -When a login page or similar sensitive input page is encountered:
+                    -Do not proceed with dummy values (e.g., dummy username, password, OTP, etc.). Instead, output the done action and clearly mention that the required credentials or sensitive inputs (e.g., OTP, User Name, Password) are needed.
+            -When the LLM is uncertain or the user's instruction does not clearly specify the input for a form field:
+            -Do not guess or insert random values. Output the done action with a note that additional clarification or specific input is required.
        - Don't hallucinate actions.
        - Use important_contents to build up memory for future actions. Whatever you think is important for the next steps, output it in important_contents. It will help you work out what is possible from the past experience
        - If the task requires specific information - make sure to include everything in the done function. This is what the user will see.
@@ -101,7 +106,7 @@ class CustomSystemPrompt(SystemPrompt):
        - If content only disappears the sequence continues.
        - Only provide the action sequence until you think the page will change.
        - Try to be efficient, e.g. fill forms at once, or chain actions where nothing changes on the page like saving, extracting, checkboxes...
-       - only use multiple actions if it makes sense.
+       - only use multiple actions if it makes sense. When using multiple action make sure to insert a time delay between the actions to ensure the page is loaded properly.
     """
         text += f"   - use maximum {self.max_actions_per_step} actions per sequence"
         return text
