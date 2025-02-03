@@ -36,7 +36,6 @@ _conversation_browser_initialized = False
 _global_agent = None
 
 
-
 async def stop_agent():
     """
     Allows user to manually request the agent to stop.
@@ -168,7 +167,8 @@ async def run_custom_agent(
         max_steps,
         use_vision,
         max_actions_per_step,
-        tool_calling_method
+        tool_calling_method,
+        user_profile
 ):
     
     global _global_browser, _global_browser_context, _global_agent_state
@@ -213,7 +213,8 @@ async def run_custom_agent(
         system_prompt_class=CustomSystemPrompt,
         max_actions_per_step=max_actions_per_step,
         agent_state=_global_agent_state,
-        tool_calling_method=tool_calling_method
+        tool_calling_method=tool_calling_method,
+        user_profile=user_profile
     )
 
     global _global_agent
@@ -263,7 +264,8 @@ async def run_browser_agent(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    profile_info
 ):
 
     from src.utils import utils
@@ -325,7 +327,8 @@ async def run_browser_agent(
             max_steps=max_steps,
             use_vision=use_vision,
             max_actions_per_step=max_actions_per_step,
-            tool_calling_method=tool_calling_method
+            tool_calling_method=tool_calling_method,
+            user_profile= profile_info
         )
 
     # Find newly created video
@@ -372,7 +375,8 @@ async def run_with_stream(
     max_steps,
     use_vision,
     max_actions_per_step,
-    tool_calling_method
+    tool_calling_method,
+    profile_info
 ):
 
     global _global_agent_state
@@ -402,7 +406,8 @@ async def run_with_stream(
             max_steps,
             use_vision,
             max_actions_per_step,
-            tool_calling_method
+            tool_calling_method,
+            profile_info=profile_info
         )
     )
 
@@ -862,6 +867,24 @@ def create_ui(config, theme_name="Ocean"):
                 pause_button.click(fn=lambda: _global_agent_state.request_stop(), outputs=[])
                 resume_button.click(fn=lambda: _global_agent_state.clear_stop(), outputs=[])
 
+            with gr.TabItem("👤 User Profile"):
+                with gr.Group():
+                    profile_name = gr.Textbox(label="Name", placeholder="Your name", lines=1)
+                    profile_email = gr.Textbox(label="Email", placeholder="Your email", lines=1)
+                    profile_interests = gr.Textbox(label="Interests", placeholder="Your interests", lines=2)
+                    # You could add more fields as needed.
+                    # Combine the fields into one profile string when saving
+                    profile_info = gr.Textbox(label="Combined Profile", visible=False)
+
+                    def combine_profile(name, email, interests):
+                        # You can format this string as needed.
+                        return f"Name: {name}\nEmail: {email}\nInterests: {interests}"
+                    combine_button = gr.Button("Save Profile")
+                    combine_button.click(fn=combine_profile,
+                                         inputs=[profile_name, profile_email, profile_interests],
+                                         outputs=profile_info)
+
+
             with gr.TabItem("📁 Configuration"):
                 with gr.Group():
                     # Possibly hidden by default if you want:
@@ -943,7 +966,7 @@ def create_ui(config, theme_name="Ocean"):
                         use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
                         save_recording_path, save_agent_history_path, save_trace_path,
                         enable_recording, task, add_infos, max_steps, use_vision, max_actions_per_step,
-                        tool_calling_method
+                        tool_calling_method, profile_info
                     ],
                     outputs=[
                         browser_view,           # Browser view

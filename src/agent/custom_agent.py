@@ -71,6 +71,7 @@ class CustomAgent(Agent):
         register_new_step_callback: Callable[[BrowserContext, AgentOutput, int], None] | None = None,
         register_done_callback: Callable[[AgentHistoryList], None] | None = None,
         tool_calling_method: Optional[str] = 'auto',
+        user_profile: Optional[str] = '',
         # Gemini parameters
         gemini_api_key: Optional[str] = None,
         gemini_model_name: str = "gemini-2.0-flash-exp",
@@ -131,6 +132,7 @@ class CustomAgent(Agent):
             max_error_length=self.max_error_length,
             max_actions_per_step=self.max_actions_per_step,
             message_context=message_context,
+            user_profile=user_profile,
         )
 
     def _setup_action_models(self) -> None:
@@ -208,7 +210,7 @@ class CustomAgent(Agent):
         """
 
         if len(prompt_messages) > 12:
-            prompt_messages = prompt_messages[:2] + prompt_messages[-10:]
+            prompt_messages = prompt_messages[:3] + prompt_messages[-9:]
 
         contents_list = []
         for msg in prompt_messages:

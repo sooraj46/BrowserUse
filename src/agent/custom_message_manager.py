@@ -28,7 +28,8 @@ class CustomMessageManager(MessageManager):
         include_attributes: list[str] = None,
         max_error_length: int = 400,
         max_actions_per_step: int = 10,
-        message_context: Optional[str] = None
+        message_context: Optional[str] = None,
+        user_profile: Optional[str] = None,
     ):
         if include_attributes is None:
             include_attributes = []
@@ -70,6 +71,15 @@ class CustomMessageManager(MessageManager):
                                 ]
                                     )
         self._add_message_with_tokens(task_message)
+        user_profile_info = HumanMessage(
+                        content=[
+                                {
+                                    "type": "text",
+                                    "text": f"User profile Information: {user_profile}"
+                                }
+                                ]
+                                    )
+        self._add_message_with_tokens(user_profile_info)
 
     def build_message_list(self) -> list[BaseMessage]:
         """

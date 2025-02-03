@@ -98,6 +98,7 @@ class CustomSystemPrompt(SystemPrompt):
 
     7. Form filling:
        - If you fill an input field and your action sequence is interrupted, most often a list with suggestions poped up under the field and you need to first select the right element from the suggestion list.
+       - UserProfile can be used for filling the name and email fields and other interest if available.
 
     8. ACTION SEQUENCING:
        - Actions are executed in the order they appear in the list
@@ -140,8 +141,7 @@ class CustomSystemPrompt(SystemPrompt):
         Build and return the system prompt for the agent.
         """
         time_str = self.current_date.strftime("%Y-%m-%d %H:%M")
-
-        # Insert `self.task` so the LLM sees the user's actual request
+        
         AGENT_PROMPT = f"""You are a precise browser automation agent that interacts with websites through structured commands. Your role is to:
     1. Analyze the provided webpage elements and structure
     2. Plan a sequence of actions to accomplish the given task
