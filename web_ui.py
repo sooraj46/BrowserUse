@@ -6,6 +6,8 @@ import asyncio
 import argparse
 
 import gradio as gr
+from datetime import datetime, timedelta
+import uuid
 from dotenv import load_dotenv
 from playwright.async_api import async_playwright
 from browser_use.agent.service import Agent
@@ -27,6 +29,7 @@ from src.utils.utils import update_model_dropdown, get_latest_files, capture_scr
 
 load_dotenv()
 
+SCHEDULED_TASKS = {}
 logger = logging.getLogger(__name__)
 
 _global_browser = None
@@ -638,6 +641,208 @@ def close_global_browser():
     except Exception as e:
         _conversation_browser_initialized = False
 
+async def schedule_recurring_browser_task(
+    agent_type,
+    llm_model_name,
+    llm_temperature,
+    llm_base_url,
+    llm_api_key,
+    use_own_browser,
+    keep_browser_open,
+    headless,
+    disable_security,
+    window_w,
+    window_h,
+    save_recording_path,
+    save_agent_history_path,
+    save_trace_path,
+    enable_recording,
+    task,
+    add_infos,
+    scheduled_time,   # "YYYY-MM-DD HH:MM" or "HH:MM"
+    repeat_frequency, # "None", "Hourly", "Daily", "Weekly", "Monthly"
+    max_steps,
+    use_vision,
+    max_actions_per_step,
+    tool_calling_method,
+    profile_info
+):
+    """
+    Schedules a browser task to run at a specific time and optionally repeat.
+    Tracks tasks in the SCHEDULED_TASKS dictionary with a unique ID.
+    """
+    now = datetime.now()
+    try:
+        # Attempt full datetime parse first
+        scheduled_dt = datetime.strptime(scheduled_time, "%Y-%m-%d %H:%M")
+    except ValueError:
+        # Fallback parse: interpret as HH:MM for *today*
+        try:
+            hours, minutes = map(int, scheduled_time.split(":"))
+            candidate_dt = datetime(
+                year=now.year,
+                month=now.month,
+                day=now.day,
+                hour=hours,
+                minute=minutes
+            )
+            if candidate_dt <= now and repeat_frequency == "None":
+                return f"Error: The scheduled time {candidate_dt} is in the past."
+            scheduled_dt = candidate_dt
+        except Exception as e:
+            return "Error: Invalid time format. Use 'YYYY-MM-DD HH:MM' or 'HH:MM'."
+
+    if scheduled_dt < now:
+        if repeat_frequency == "Hourly":
+            scheduled_dt += timedelta(hours=1)
+        elif repeat_frequency == "Daily":
+            scheduled_dt += timedelta(days=1)
+        elif repeat_frequency == "Weekly":
+            scheduled_dt += timedelta(weeks=1)
+        elif repeat_frequency == "Monthly":
+            scheduled_dt += timedelta(days=30)
+        else:
+            return f"Error: The scheduled time {scheduled_dt} is in the past."
+
+    task_id = str(uuid.uuid4())[:8]
+    SCHEDULED_TASKS[task_id] = {
+        "task_id": task_id,
+        "task_description": task,
+        "add_infos": add_infos,
+        "scheduled_for": scheduled_dt,
+        "repeat_frequency": repeat_frequency,
+        "canceled": False,
+        "agent_params": {
+            "agent_type": agent_type,
+            "llm_model_name": llm_model_name,
+            "llm_temperature": llm_temperature,
+            "llm_base_url": llm_base_url,
+            "llm_api_key": llm_api_key,
+            "use_own_browser": use_own_browser,
+            "keep_browser_open": keep_browser_open,
+            "headless": headless,
+            "disable_security": disable_security,
+            "window_w": window_w,
+            "window_h": window_h,
+            "save_recording_path": save_recording_path,
+            "save_agent_history_path": save_agent_history_path,
+            "save_trace_path": save_trace_path,
+            "enable_recording": enable_recording,
+            "task": task,
+            "add_infos": add_infos,
+            "max_steps": max_steps,
+            "use_vision": use_vision,
+            "max_actions_per_step": max_actions_per_step,
+            "tool_calling_method": tool_calling_method,
+            "profile_info": profile_info,
+        }
+    }
+
+    asyncio.create_task(_run_scheduled_task(task_id))
+    return (f"Task scheduled (ID={task_id}) for "
+            f"{scheduled_dt.strftime('%Y-%m-%d %H:%M')} "
+            f"(repeat={repeat_frequency}).")
+
+
+async def _run_scheduled_task(task_id: str):
+    """
+    Helper that waits for the scheduled time, runs the task,
+    and reschedules if needed (based on repeat_frequency).
+    """
+    while True:
+        if task_id not in SCHEDULED_TASKS:
+            return
+        info = SCHEDULED_TASKS[task_id]
+        if info["canceled"]:
+            return
+
+        now = datetime.now()
+        scheduled_dt = info["scheduled_for"]
+        if scheduled_dt <= now:
+            logger.info(f"Running scheduled task {task_id} at {now}.")
+            if info["canceled"]:
+                return
+
+            agent_params = info["agent_params"]
+            try:
+                result = await run_browser_agent(
+                    agent_params["agent_type"],
+                    agent_params["llm_model_name"],
+                    agent_params["llm_temperature"],
+                    agent_params["llm_base_url"],
+                    agent_params["llm_api_key"],
+                    agent_params["use_own_browser"],
+                    agent_params["keep_browser_open"],
+                    agent_params["headless"],
+                    agent_params["disable_security"],
+                    agent_params["window_w"],
+                    agent_params["window_h"],
+                    agent_params["save_recording_path"],
+                    agent_params["save_agent_history_path"],
+                    agent_params["save_trace_path"],
+                    agent_params["enable_recording"],
+                    agent_params["task"],
+                    agent_params["add_infos"],
+                    agent_params["max_steps"],
+                    agent_params["use_vision"],
+                    agent_params["max_actions_per_step"],
+                    agent_params["tool_calling_method"],
+                    agent_params["profile_info"]
+                )
+                logger.info(f"Scheduled task {task_id} done. Final result: {result[0]}")
+            except Exception as e:
+                logger.error(f"Scheduled task {task_id} failed: {e}")
+
+            freq = info["repeat_frequency"]
+            if freq == "None":
+                SCHEDULED_TASKS.pop(task_id, None)
+                return
+            else:
+                next_dt = _calc_next_occurrence(scheduled_dt, freq)
+                if not next_dt:
+                    SCHEDULED_TASKS.pop(task_id, None)
+                    return
+                info["scheduled_for"] = next_dt
+                SCHEDULED_TASKS[task_id] = info
+                logger.info(f"Rescheduled task {task_id} for {next_dt}.")
+        else:
+            wait_time = (scheduled_dt - now).total_seconds()
+            await asyncio.sleep(wait_time)
+
+
+def _calc_next_occurrence(d: datetime, freq: str) -> datetime:
+    if freq == "Hourly":
+        return d + timedelta(hours=1)
+    elif freq == "Daily":
+        return d + timedelta(days=1)
+    elif freq == "Weekly":
+        return d + timedelta(weeks=1)
+    elif freq == "Monthly":
+        return d + timedelta(days=30)
+    else:
+        return None
+
+
+def list_scheduled_tasks() -> str:
+    if not SCHEDULED_TASKS:
+        return "No tasks scheduled."
+    lines = []
+    for tid, info in SCHEDULED_TASKS.items():
+        status = "Canceled" if info["canceled"] else "Active"
+        lines.append(
+            f"ID={tid}, NextRun={info['scheduled_for'].strftime('%Y-%m-%d %H:%M')}, "
+            f"Repeat={info['repeat_frequency']}, Status={status}, "
+            f"Desc='{info['task_description']}'"
+        )
+    return "\n".join(lines)
+
+
+def cancel_scheduled_task(task_id: str) -> str:
+    if task_id not in SCHEDULED_TASKS:
+        return f"No scheduled task with ID={task_id} found."
+    SCHEDULED_TASKS[task_id]["canceled"] = True
+    return f"Task (ID={task_id}) canceled successfully."
+
 def create_ui(config, theme_name="Ocean"):
     css = """
     .gradio-container {
@@ -664,6 +869,7 @@ def create_ui(config, theme_name="Ocean"):
     }.get(theme_name, Ocean())
 
     with gr.Blocks(title="Browser Use WebUI", theme=chosen_theme, css=css) as demo:
+        profile_info = gr.State("")
         with gr.Row():
             gr.Markdown(
                 """
@@ -871,6 +1077,79 @@ def create_ui(config, theme_name="Ocean"):
                 pause_button.click(fn=lambda: _global_agent_state.request_stop(), outputs=[])
                 resume_button.click(fn=lambda: _global_agent_state.clear_stop(), outputs=[])
 
+            with gr.TabItem("🗓 Task Scheduler"):
+                gr.Markdown("### Schedule a Browser Task (Recurring)")
+                with gr.Group():
+                    sched_task = gr.Textbox(
+                        label="Task Description",
+                        lines=3,
+                        placeholder="Enter the task you want to schedule...",
+                        info="Describe the browser task to run."
+                    )
+                    sched_add_infos = gr.Textbox(
+                        label="Additional Information",
+                        lines=2,
+                        placeholder="Any additional instructions...",
+                        info="Extra hints for the task."
+                    )
+                    sched_time = gr.Textbox(
+                        label="Scheduled Time",
+                        placeholder="YYYY-MM-DD HH:MM or HH:MM",
+                        info="Time when the task should run (e.g. '2025-03-11 14:30' or '14:30' for today)"
+                    )
+                    sched_repeat = gr.Dropdown(
+                        label="Repeat Frequency",
+                        choices=["None", "Hourly", "Daily", "Weekly", "Monthly"],
+                        value="None",
+                        info="Repeat frequency for the task"
+                    )
+
+                    schedule_button = gr.Button("Schedule Task", variant="primary")
+                    sched_status = gr.Textbox(
+                        label="Status",
+                        lines=2,
+                        interactive=False
+                    )
+
+                schedule_button.click(
+                    fn=schedule_recurring_browser_task,
+                    inputs=[
+                        agent_type, llm_model_name, llm_temperature, llm_base_url, llm_api_key,
+                        use_own_browser, keep_browser_open, headless, disable_security, window_w, window_h,
+                        save_recording_path, save_agent_history_path, save_trace_path,
+                        enable_recording, sched_task, sched_add_infos, sched_time, sched_repeat,
+                        max_steps, use_vision, max_actions_per_step, tool_calling_method, profile_info
+                    ],
+                    outputs=sched_status,
+                    queue=True
+                )
+
+                gr.Markdown("### Manage Scheduled Tasks")
+                with gr.Row():
+                    refresh_button = gr.Button("Refresh Tasks", variant="secondary")
+                    tasks_list = gr.Textbox(
+                        label="Scheduled Tasks",
+                        lines=10,
+                        interactive=False
+                    )
+                refresh_button.click(
+                    fn=list_scheduled_tasks,
+                    outputs=tasks_list
+                )
+
+                with gr.Row():
+                    cancel_id = gr.Textbox(
+                        label="Task ID to Cancel",
+                        placeholder="Enter the Task ID"
+                    )
+                    cancel_button = gr.Button("Cancel Task", variant="stop")
+                    cancel_status = gr.Textbox(label="Cancel Status", lines=2)
+                cancel_button.click(
+                    fn=cancel_scheduled_task,
+                    inputs=cancel_id,
+                    outputs=cancel_status
+                )
+
             with gr.TabItem("👤 User Profile"):
                 with gr.Group():
                     profile_name = gr.Textbox(label="Name", placeholder="Your name", lines=1)
@@ -884,9 +1163,11 @@ def create_ui(config, theme_name="Ocean"):
                         # You can format this string as needed.
                         return f"Name: {name}\nEmail: {email}\nInterests: {interests}"
                     combine_button = gr.Button("Save Profile")
-                    combine_button.click(fn=combine_profile,
-                                         inputs=[profile_name, profile_email, profile_interests],
-                                         outputs=profile_info)
+                    combine_button.click(
+                        fn=lambda name, email, interests: f"Name: {name}\nEmail: {email}\nInterests: {interests}",
+                        inputs=[profile_name, profile_email, profile_interests],
+                        outputs=profile_info
+                    )
 
 
             with gr.TabItem("📁 Configuration"):
