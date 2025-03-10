@@ -35,6 +35,16 @@ class UploadFileAction(BaseModel):
     selector: str
     file_path: str
 
+class WriteFileAction(BaseModel):
+    file_path: str
+    content: str
+
+class AppendFileAction(BaseModel):
+    file_path: str
+    content: str
+
+class ReadFileAction(BaseModel):
+    file_path: str
 
 class ExecuteJavascriptAction(BaseModel):
     script: str

@@ -38,6 +38,9 @@ from ..agent.custom_views import (
     SwitchToFrameAction,
     HandleAlertAction,
     PauseForHumanInputAction, 
+    WriteFileAction,
+    AppendFileAction,
+    ReadFileAction
 )
 
 class CustomController(Controller):
@@ -339,3 +342,24 @@ class CustomController(Controller):
                 success=True,
                 extracted_content=f"Pausing for user input. Prompt: {params.message}"
             )
+
+        @self.registry.action("Write to a text file", param_model=WriteFileAction)
+        def write_text_file(params: WriteFileAction):
+            with open(params.file_path, "w", encoding="utf-8") as f:
+                f.write(params.content)
+            return ActionResult(success=True, extracted_content=f"Wrote to file {params.file_path}")
+
+        @self.registry.action("Append text to a file", param_model=AppendFileAction)
+        def append_text_file(params: AppendFileAction):
+            with open(params.file_path, "a", encoding="utf-8") as f:
+                f.write(params.content)
+            return ActionResult(success=True, extracted_content=f"Appended to file {params.file_path}")
+
+        @self.registry.action("Read text file", param_model=ReadFileAction)
+        def read_text_file(params: ReadFileAction):
+            try:
+                with open(params.file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                return ActionResult(success=True, extracted_content=content)
+            except Exception as e:
+                return ActionResult(success=False, error=str(e))

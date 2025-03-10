@@ -593,26 +593,30 @@ async def agent_respond_stream(
     _global_agent = agent  # Save the running agent globally.
 
     agent_response_text = ""  # Accumulate the agent's responses.
-    async for partial_info in agent.run_stream(max_steps=max_steps):
-        agent_thoughts = partial_info.get("thoughts", "")
-        done_flag = partial_info.get("done", False)
-        step_output = ""
-        if agent_thoughts:
-            step_output = f"**Thought**: {agent_thoughts}\n\n"
-
-        if step_output:
-            agent_response_text = step_output
-
-        # Update conversation state with the agent's response.
-        conv_state.append({"role": "assistant", "content": agent_response_text})
+    try:
+        async for partial_info in agent.run_stream(max_steps=max_steps):
+            agent_thoughts = partial_info.get("thoughts", "")
+            done_flag = partial_info.get("done", False)
+            step_output = ""
+            if agent_thoughts:
+                step_output = f"**Thought**: {agent_thoughts}\n\n"
+            if step_output:
+                agent_response_text = step_output
+            conv_state.append({"role": "assistant", "content": agent_response_text})
+            yield conv_state, gr.update(value="")
+            if done_flag:
+                final_result = partial_info.get("final_result", "")
+                if final_result:
+                    agent_response_text = f"\n**Final Result**: {final_result}"
+                    conv_state.append({"role": "assistant", "content": agent_response_text})
+                break
+    except Exception as e:
+        if "Timeout" in str(e):
+            error_message = "Error: Screenshot timed out. Please try again later."
+        else:
+            error_message = f"An unexpected error occurred: {str(e)}"
+        conv_state.append({"role": "assistant", "content": error_message})
         yield conv_state, gr.update(value="")
-
-        if done_flag:
-            final_result = partial_info.get("final_result", "")
-            if final_result:
-                agent_response_text = f"\n**Final Result**: {final_result}"
-                conv_state.append({"role": "assistant", "content": agent_response_text})
-            break
 
     # Clear the global agent variable after completion so that new input will start a new task.
     _global_agent = None
