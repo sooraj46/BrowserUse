@@ -8,3 +8,5 @@ pyperclip
 pytest
 google.genai
 pyautogui
+flask
+authlib

@@ -47,6 +47,12 @@ playwright install
   GOOGLE_API_KEY=YOUR_GEMINI_API_KEY
   ```
   Replace `YOUR_GEMINI_API_KEY` with your actual key.
+- **Google OAuth Credentials** for login:
+  ```ini
+  GOOGLE_CLIENT_ID=YOUR_GOOGLE_CLIENT_ID
+  GOOGLE_CLIENT_SECRET=YOUR_GOOGLE_CLIENT_SECRET
+  FLASK_SECRET_KEY=some_random_secret
+  ```
 
 #### Optional:
 
@@ -63,11 +69,11 @@ playwright install
 
 ### Running the Web UI
 
-1. Navigate to the repository directory:
+1. Navigate to the repository directory and start the server:
    ```bash
-   python web_ui.py
+   python app.py
    ```
-2. Open a browser and go to the displayed address (e.g., `http://127.0.0.1:7788`).
+2. You will be redirected to a Google login page. After signing in, you will be sent to the Gradio interface (by default at `http://127.0.0.1:7788`).
 3. Use the **Web UI** to:
    - Configure **agent settings**, **LLM parameters**, and **browser options**.
    - Enter a task description and optional hints.
